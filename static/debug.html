@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API 调试 - 多平台认证版</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 30px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .config-section {
+            background: #e3f2fd;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border-left: 4px solid #2196F3;
+        }
+        .config-section h3 {
+            margin-top: 0;
+            color: #1976D2;
+        }
+        .config-row {
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+        }
+        .config-row label {
+            width: 150px;
+            font-weight: bold;
+            color: #555;
+        }
+        .config-row input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .api-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .api-section h2 {
+            margin-top: 0;
+            color: #555;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        textarea {
+            width: 100%;
+            min-height: 120px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 13px;
+            margin: 10px 0;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .response {
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success { border-left: 4px solid #4CAF50; }
+        .error { border-left: 4px solid #f44336; }
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .badge-admin { background: #ff9800; color: white; }
+        .badge-platform { background: #2196F3; color: white; }
+    </style>
+</head>
+<body>
+    <h1>🎮 游戏 API 调试工具</h1>
+
+    <!-- 认证配置 -->
+    <div class="config-section">
+        <h3>🔐 认证配置</h3>
+        <div class="config-row">
+            <label>管理员Token:</label>
+            <input type="text" id="adminToken" value="admin_secret_token_change_in_production">
+        </div>
+        <div class="config-row">
+            <label>平台AppKey:</label>
+            <input type="text" id="platformKey" value="demo_platform">
+        </div>
+        <div class="config-row">
+            <label>平台用户ID:</label>
+            <input type="text" id="platformUserId" value="9999">
+        </div>
+        <div class="config-row">
+            <label>平台用户名:</label>
+            <input type="text" id="platformUserName" value="Chris">
+        </div>
+        <p style="margin: 15px 0 0 0; color: #666; font-size: 13px;">
+            💡 <strong>演示模式已启用</strong>：当前使用简化认证，只需提供基本的平台信息即可。<br>
+            生产环境需要使用 HMAC-SHA256 签名认证。
+        </p>
+    </div>
+
+    <div style="background: #fff3cd; padding: 15px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #ffc107;">
+        <strong>⚠️ 完整游戏流程：</strong>
+        <ol style="margin: 10px 0 0 20px; line-height: 1.8;">
+            <li><strong>游戏开始</strong>：调用游戏事件 <code>event_type=1</code> (game_start) - 创建游戏回合，状态变为 betting</li>
+            <li><strong>用户投注</strong>：调用投注接口 - 用户下注</li>
+            <li><strong>游戏封盘</strong>：调用游戏事件 <code>event_type=2</code> (game_stop) - 停止下注，状态变为 sealed</li>
+            <li><strong>发牌</strong>：调用游戏事件 <code>event_type=3</code> (new_card) - 发牌，状态变为 dealt</li>
+            <li><strong>准备开奖</strong>：调用游戏事件 <code>event_type=4</code> (game_draw) - 准备开奖，状态变为 drawn</li>
+            <li><strong>开奖结算</strong>：调用开奖接口 - 输入开奖结果并结算（<strong style="color: #d9534f;">必须完成此步骤</strong>）</li>
+            <li><strong>游戏结束</strong>：调用游戏事件 <code>event_type=5</code> (game_end) - 结束游戏，状态变为 finished（<strong style="color: #d9534f;">必须先完成开奖结算</strong>）</li>
+        </ol>
+    </div>
+
+    <!-- 游戏事件 -->
+    <div class="api-section">
+        <h2>1. 游戏事件 - POST /api/game_event <span class="badge badge-admin">管理员</span></h2>
+        <p style="color: #666; font-size: 13px; margin-bottom: 10px;">
+            event_type: 1=游戏开始(init→betting), 2=封盘(betting→sealed), 3=发牌(sealed→dealt), 4=准备开奖(dealt→drawn), 5=结束(drawn→finished)
+        </p>
+        <textarea id="gameEventInput">{
+  "game_id": "dt_game",
+  "room_id": "room_001",
+  "game_round_id": "round_1234567890",
+  "event_type": 1
+}</textarea>
+        <button onclick="callGameEvent()">发送请求</button>
+        <div id="gameEventResponse" class="response"></div>
+    </div>
+
+    <!-- 投注 -->
+    <div class="api-section">
+        <h2>2. 投注 - POST /api/bet <span class="badge badge-platform">平台认证</span></h2>
+        <p style="color: #666; font-size: 13px; margin-bottom: 10px;">
+            play_type: 1=Dragon, 2=Tiger, 3=Tie | bet_amount: 字符串格式（演示模式下会自动创建用户）<br>
+            platform: 投注平台（可选，默认1）
+        </p>
+        <textarea id="betInput">{
+  "game_id": "dt_game",
+  "room_id": "room_001",
+  "game_round_id": "round_1234567890",
+  "bet_amount": "100.00",
+  "play_type": 1,
+  "platform": 1,
+  "idempotency_key": "bet_1234567890"
+}</textarea>
+        <button onclick="callBet()">发送请求</button>
+        <div id="betResponse" class="response"></div>
+    </div>
+
+    <!-- 开奖 -->
+    <div class="api-section">
+        <h2>3. 开奖结算 - POST /api/drawresult <span class="badge badge-admin">管理员</span></h2>
+        <p style="color: #666; font-size: 13px; margin-bottom: 10px;">
+            ⚠️ 必须先调用 event_type=4 触发 game_draw 事件，状态变为 drawn 后才能调用此接口<br>
+            card_list: D5,T3,RDragon (Dragon赢) | D1,T2,RTiger (Tiger赢) | D9,T9,RTie (和局)
+        </p>
+        <textarea id="drawInput">{
+  "game_id": "dt_game",
+  "room_id": "room_001",
+  "game_round_id": "round_1234567890",
+  "card_list": "D5,T3,RDragon"
+}</textarea>
+        <button onclick="callDraw()">发送请求</button>
+        <div id="drawResponse" class="response"></div>
+    </div>
+
+    <!-- 用户余额查询 -->
+    <div class="api-section">
+        <h2>4. 用户余额查询 - GET /api/user/balance <span class="badge badge-platform">平台认证</span></h2>
+        <p style="color: #666; font-size: 13px; margin-bottom: 10px;">
+            查询平台用户的当前余额（使用上方配置的平台用户ID）
+        </p>
+        <button onclick="callBalance()">查询余额</button>
+        <div id="balanceResponse" class="response"></div>
+    </div>
+
+    <!-- 用户投注记录查询 -->
+    <div class="api-section">
+        <h2>5. 用户投注记录查询 - GET /api/user/bets <span class="badge badge-platform">平台认证</span></h2>
+        <p style="color: #666; font-size: 13px; margin-bottom: 10px;">
+            查询平台用户的投注历史记录（使用上方配置的平台用户ID）
+        </p>
+        <div style="margin: 10px 0;">
+            <label>游戏回合ID (可选): </label>
+            <input type="text" id="betsRoundId" value="" placeholder="留空查询所有" style="width: 250px; padding: 5px; border: 1px solid #ddd; border-radius: 4px;">
+            <label style="margin-left: 10px;">页码: </label>
+            <input type="text" id="betsPage" value="1" style="width: 60px; padding: 5px; border: 1px solid #ddd; border-radius: 4px;">
+            <label style="margin-left: 10px;">每页数量: </label>
+            <input type="text" id="betsPageSize" value="10" style="width: 60px; padding: 5px; border: 1px solid #ddd; border-radius: 4px;">
+            <button onclick="callBets()">查询记录</button>
+        </div>
+        <div id="betsResponse" class="response"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8087';
+
+        // 获取管理员认证头
+        function getAdminHeaders() {
+            const token = document.getElementById('adminToken').value;
+            return {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            };
+        }
+
+        // 获取平台认证头（演示模式）
+        function getPlatformHeaders() {
+            const platformKey = document.getElementById('platformKey').value;
+            const platformUserId = document.getElementById('platformUserId').value;
+            const platformUserName = document.getElementById('platformUserName').value;
+            const timestamp = Math.floor(Date.now() / 1000).toString(); // 秒级时间戳
+            const nonce = 'nonce_' + Math.random().toString(36).substring(2, 15);
+
+            return {
+                'Content-Type': 'application/json',
+                'X-Platform-Key': platformKey,
+                'X-Platform-User-Id': platformUserId,
+                'X-Platform-User-Name': encodeURIComponent(platformUserName),
+                'X-Timestamp': timestamp,
+                'X-Nonce': nonce,
+                'X-Signature': 'demo_signature_not_required_in_demo_mode'
+            };
+        }
+
+        // 通用API调用（POST）
+        async function callAPI(endpoint, inputId, responseId, headers) {
+            const input = document.getElementById(inputId).value;
+            const responseEl = document.getElementById(responseId);
+
+            try {
+                const data = JSON.parse(input);
+                responseEl.textContent = '请求中...';
+                responseEl.className = 'response';
+
+                const response = await fetch(API_BASE + endpoint, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(data)
+                });
+
+                let result;
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    result = await response.json();
+                } else {
+                    result = await response.text();
+                }
+
+                responseEl.className = response.ok ? 'response success' : 'response error';
+                responseEl.textContent = `状态: ${response.status}\n\n` +
+                    (typeof result === 'string' ? result : JSON.stringify(result, null, 2));
+            } catch (error) {
+                responseEl.className = 'response error';
+                responseEl.textContent = '错误: ' + error.message;
+            }
+        }
+
+        // 游戏事件（管理员认证）
+        function callGameEvent() {
+            callAPI('/api/game_event', 'gameEventInput', 'gameEventResponse', getAdminHeaders());
+        }
+
+        // 投注（平台认证）
+        function callBet() {
+            callAPI('/api/bet', 'betInput', 'betResponse', getPlatformHeaders());
+        }
+
+        // 开奖（管理员认证）
+        function callDraw() {
+            callAPI('/api/drawresult', 'drawInput', 'drawResponse', getAdminHeaders());
+        }
+
+        // 用户余额查询（平台认证）
+        async function callBalance() {
+            const platformUserId = document.getElementById('platformUserId').value;
+            const responseEl = document.getElementById('balanceResponse');
+
+            if (!platformUserId) {
+                responseEl.className = 'response error';
+                responseEl.textContent = '错误: 请在上方配置平台用户ID';
+                return;
+            }
+
+            try {
+                responseEl.textContent = '请求中...';
+                responseEl.className = 'response';
+
+                const response = await fetch(`${API_BASE}/api/user/balance`, {
+                    method: 'GET',
+                    headers: getPlatformHeaders()
+                });
+
+                let result;
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    result = await response.json();
+                } else {
+                    result = await response.text();
+                }
+
+                responseEl.className = response.ok ? 'response success' : 'response error';
+                responseEl.textContent = `状态: ${response.status}\n\n` +
+                    (typeof result === 'string' ? result : JSON.stringify(result, null, 2));
+            } catch (error) {
+                responseEl.className = 'response error';
+                responseEl.textContent = '错误: ' + error.message;
+            }
+        }
+
+        // 用户投注记录查询（平台认证）
+        async function callBets() {
+            const platformUserId = document.getElementById('platformUserId').value;
+            const roundId = document.getElementById('betsRoundId').value;
+            const page = document.getElementById('betsPage').value;
+            const pageSize = document.getElementById('betsPageSize').value;
+            const responseEl = document.getElementById('betsResponse');
+
+            if (!platformUserId) {
+                responseEl.className = 'response error';
+                responseEl.textContent = '错误: 请在上方配置平台用户ID';
+                return;
+            }
+
+            try {
+                responseEl.textContent = '请求中...';
+                responseEl.className = 'response';
+
+                let url = `${API_BASE}/api/user/bets?page=${page}&page_size=${pageSize}`;
+                if (roundId) {
+                    url += `&game_round_id=${roundId}`;
+                }
+
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: getPlatformHeaders()
+                });
+
+                let result;
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    result = await response.json();
+                } else {
+                    result = await response.text();
+                }
+
+                responseEl.className = response.ok ? 'response success' : 'response error';
+                responseEl.textContent = `状态: ${response.status}\n\n` +
+                    (typeof result === 'string' ? result : JSON.stringify(result, null, 2));
+            } catch (error) {
+                responseEl.className = 'response error';
+                responseEl.textContent = '错误: ' + error.message;
+            }
+        }
+
+        // 页面加载时生成时间戳和唯一ID
+        window.onload = function() {
+            const timestamp = Date.now();
+            const roundId = 'round_' + timestamp;
+            const betKey = 'bet_' + timestamp;
+
+            // 更新所有输入框中的 round_id 和 idempotency_key
+            ['gameEventInput', 'betInput', 'drawInput'].forEach(id => {
+                const el = document.getElementById(id);
+                let json = JSON.parse(el.value);
+                json.game_round_id = roundId;
+                if (id === 'betInput') {
+                    json.idempotency_key = betKey;
+                }
+                el.value = JSON.stringify(json, null, 2);
+            });
+
+            // 更新投注记录查询的回合ID提示
+            document.getElementById('betsRoundId').placeholder = `例如: ${roundId}`;
+
+            console.log('🎮 API调试工具已加载');
+            console.log('📋 当前游戏回合ID:', roundId);
+            console.log('🔐 认证模式: 演示模式（简化认证）');
+        };
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,110 @@
+{
+  "server": {
+    "port": 8087,
+    "log_level": "info"
+  },
+  "database": {
+    "dsn": "root:@tcp(127.0.0.1:3306)/dt_game?parseTime=true&loc=Local",
+    "max_open_conns": 50,
+    "max_idle_conns": 10,
+    "conn_max_lifetime_sec": 600
+  },
+  "redis": {
+    "addr": "127.0.0.1:6379",
+    "password": "",
+    "db": 0
+  },
+  "rocketmq": {
+    "name_server": "127.0.0.1:9876",
+    "producer_group": "game-producer",
+    "consumer_group": "game-consumer",
+    "topic_settle": "dt_settle",
+    "access_key": "rocketmq",
+    "secret_key": "rocketmq123"
+  },
+  "observability": {
+    "enable_prom": true,
+    "prom_addr": ":9090",
+    "enable_trace": true,
+    "otlp_endpoint": ""
+  },
+  "auth": {
+    "demo_mode": true,
+    "jwt": {
+      "secret": "your-256-bit-secret-key-change-in-production-env",
+      "access_token_ttl": 3600,
+      "refresh_token_ttl": 604800,
+      "issuer": "dt-server"
+    },
+    "admin": {
+      "enabled": true,
+      "token": "admin_secret_token_change_in_production"
+    },
+    "demo_platform": {
+      "platform_id": 99,
+      "app_key": "demo_platform",
+      "app_secret": "demo_secret_for_testing_only",
+      "name": "演示平台"
+    },
+    "platforms": [
+      {
+        "platform_id": 1,
+        "app_key": "web_platform_001",
+        "app_secret": "sk_web_1a2b3c4d5e6f7g8h9i0j",
+        "name": "Web端平台",
+        "status": 1,
+        "rate_limit": 1000,
+        "allowed_ips": []
+      },
+      {
+        "platform_id": 2,
+        "app_key": "ios_platform_001",
+        "app_secret": "sk_ios_9i8h7g6f5e4d3c2b1a0j",
+        "name": "iOS App平台",
+        "status": 1,
+        "rate_limit": 500,
+        "allowed_ips": []
+      },
+      {
+        "platform_id": 3,
+        "app_key": "android_platform_001",
+        "app_secret": "sk_android_k9j8h7g6f5e4d3c2b1a",
+        "name": "Android App平台",
+        "status": 1,
+        "rate_limit": 500,
+        "allowed_ips": []
+      }
+    ]
+  },
+  "rate_limit": {
+    "enabled": true,
+    "global": {
+      "requests_per_second": 1000,
+      "burst": 2000
+    },
+    "by_ip": {
+      "requests_per_second": 100,
+      "burst": 200,
+      "window_seconds": 60
+    },
+    "by_user": {
+      "requests_per_second": 50,
+      "burst": 100,
+      "window_seconds": 60
+    },
+    "by_platform": {
+      "requests_per_second": 500,
+      "burst": 1000,
+      "window_seconds": 60
+    }
+  },
+  "cors": {
+    "enabled": true,
+    "allowed_origins": ["http://localhost:3000", "http://localhost:8087"],
+    "allowed_methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    "allowed_headers": ["Content-Type", "Authorization", "X-Platform-Key", "X-Timestamp", "X-Nonce", "X-Signature", "X-Platform-User-Id", "X-Platform-User-Name"],
+    "exposed_headers": ["X-Request-Id"],
+    "allow_credentials": true,
+    "max_age": 3600
+  }
+}

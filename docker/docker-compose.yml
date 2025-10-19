@@ -1,0 +1,27 @@
+
+services:
+  namesrv:
+    image: apache/rocketmq:5.1.4
+    container_name: rmq-namesrv
+    platform: linux/amd64
+    # ports:
+    #   - "9876:9876"
+    command: sh -c "/home/rocketmq/rocketmq-5.1.4/bin/mqnamesrv"
+
+  broker:
+    image: apache/rocketmq:5.1.4
+    container_name: rmq-broker
+    platform: linux/amd64
+    depends_on:
+      - namesrv
+    environment:
+      - NAMESRV_ADDR=namesrv:9876
+      - JAVA_OPTS=-Drocketmq.proxy.grpcServerPort=8081 -Drocketmq.proxy.remotingListenPort=8080 -Drocketmq.client.logUseSlf4j=true
+    volumes:
+      - ./broker.conf:/home/rocketmq/rocketmq-5.1.4/conf/broker.conf
+    ports:
+      - "8081:8081"
+      - "10911:10911"
+      - "10909:10909"
+    command: sh -c "/home/rocketmq/rocketmq-5.1.4/bin/mqbroker -n namesrv:9876 --enable-proxy -c /home/rocketmq/rocketmq-5.1.4/conf/broker.conf"
+

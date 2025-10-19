@@ -1,0 +1,87 @@
+# Docker Compose - 最小化版本（无 RocketMQ）
+# 适用于 Windows 和 ARM64 Mac (Apple Silicon)
+# 
+# 使用方法：
+#   docker-compose -f docker-compose-minimal.yml up -d --build
+#
+# 注意：此版本移除了 RocketMQ 依赖，适合快速测试和开发
+
+services:
+  # MySQL 数据库
+  mysql:
+    image: mysql:8.0
+    container_name: dt-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: dt_game
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - dt-network
+
+  # Redis 缓存
+  redis:
+    image: redis:7-alpine
+    container_name: dt-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - dt-network
+
+  # Dragon vs Tiger 游戏服务器（使用本地配置文件）
+  dt-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dt-server
+    ports:
+      - "8087:8087"
+    environment:
+      # 使用本地配置文件（挂载到容器内）
+      - CONFIG_FILE=/app/config/docker.json
+      # 时区
+      - TZ=Asia/Shanghai
+    volumes:
+      # 挂载配置文件到容器
+      - ./config:/app/config:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8087/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dt-network
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  dt-network:
+    driver: bridge
+

@@ -1,0 +1,38 @@
+{
+  "server": {
+    "port": 8087,
+    "log_level": "info"
+  },
+  "database": {
+    "dsn": "root:root@tcp(mysql:3306)/dt_game?charset=utf8mb4&parseTime=True&loc=Local",
+    "max_open_conns": 50,
+    "max_idle_conns": 10,
+    "conn_max_lifetime_sec": 600
+  },
+  "redis": {
+    "addr": "redis:6379",
+    "password": "",
+    "db": 0
+  },
+  "rocketmq": {
+    "name_server": "rocketmq-namesrv:9876",
+    "producer_group": "game-producer",
+    "consumer_group": "game-consumer",
+    "topic_settle": "dt_settle",
+    "access_key": "rocketmq",
+    "secret_key": "rocketmq123"
+  },
+  "observability": {
+    "enable_prom": false,
+    "prom_addr": ":9090",
+    "enable_trace": false,
+    "otlp_endpoint": ""
+  },
+  "feature_flags": {
+    "enable_conflict_check": true
+  },
+  "thresholds": {
+    "max_bet_amount": 10000
+  }
+}
+
