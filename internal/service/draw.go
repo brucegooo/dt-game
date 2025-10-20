@@ -276,9 +276,12 @@ func (s *drawService) SubmitDrawResult(ctx context.Context, in DrawInput) error 
 		return err
 	}
 
-	// 更新结算日志的统计信息
-	settlementLog.TotalOrders = len(orders)
-	settlementLog.TotalPayout = totalPayout
+	// 更新结算日志的统计信息（写入数据库）
+	if err := model.UpdateSettlementStats(ctx, tx, in.GameRoundID, len(orders), totalPayout); err != nil {
+		fmt.Printf("[DrawResult] 更新结算日志统计失败: round_id=%s, error=%v, trace_id=%s\n",
+			in.GameRoundID, err, in.TraceID)
+		return err
+	}
 
 	// 审计事件 - draw_result（开奖结算）
 	auditPayload := map[string]any{
@@ -424,15 +427,38 @@ func calculateResult(dragonCard, tigerCard int) string {
 }
 
 // 计算派彩金额
+// 重要：下注时已经扣款，派彩金额是用户最终收到的金额
+// 规则：
+// 1. 投注龙/虎，结果匹配 -> 派彩 = 本金 + 本金 × 赔率 = 本金 × (1 + 赔率)
+// 2. 投注龙/虎，结果是和 -> 派彩 = 本金（退还本金）
+// 3. 投注龙/虎，结果不匹配 -> 派彩 = 0（输掉本金）
+// 4. 投注和，结果是和 -> 派彩 = 本金 + 本金 × 赔率 = 本金 × (1 + 赔率)
+// 5. 投注和，结果不是和 -> 派彩 = 0（输掉本金）
+//
+// 示例：
+// - 投注龙 100，赔率 0.95，龙赢 -> 派彩 = 100 + 100×0.95 = 195（用户余额变化：-100+195=+95）
+// - 投注和 50，赔率 8.00，和局 -> 派彩 = 50 + 50×8 = 450（用户余额变化：-50+450=+400）
+// - 投注龙 100，和局 -> 派彩 = 100（用户余额变化：-100+100=0，不输不赢）
 func settlePayout(o model.Order, result string) float64 {
 	pt := strings.ToLower(o.PlayType)
+	betAmt := decimal.NewFromFloat(o.BetAmount)
+
+	// 情况1: 投注类型与结果匹配（赢）-> 返还本金 + 赢的钱
 	if pt == result {
 		// 使用 decimal 进行精确计算，避免浮点数精度问题
-		betAmt := decimal.NewFromFloat(o.BetAmount)
 		odds := decimal.NewFromFloat(o.BetOdds)
-		payout := betAmt.Mul(odds).Round(2)
+		// 派彩 = 本金 + 本金 × 赔率 = 本金 × (1 + 赔率)
+		one := decimal.NewFromInt(1)
+		payout := betAmt.Mul(one.Add(odds)).Round(2)
 		return payout.InexactFloat64()
 	}
+
+	// 情况2: 投注龙或虎，结果是和局 -> 退还本金
+	if (pt == "dragon" || pt == "tiger") && result == "tie" {
+		return betAmt.InexactFloat64()
+	}
+
+	// 情况3: 其他情况（输）
 	return 0
 }
 

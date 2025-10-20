@@ -9,15 +9,15 @@ import (
 
 // SettlementLog 结算日志表（防止重复结算）
 type SettlementLog struct {
-	ID           int64   `db:"id"`             // 自增ID
-	GameRoundID  string  `db:"game_round_id"`  // 游戏回合ID
-	CardList     string  `db:"card_list"`      // 牌面信息
-	Result       string  `db:"result"`         // 游戏结果: dragon|tiger|tie
-	TotalOrders  int     `db:"total_orders"`   // 结算订单总数
-	TotalPayout  float64 `db:"total_payout"`   // 总派彩金额
-	Operator     string  `db:"operator"`       // 操作人
-	TraceID      string  `db:"trace_id"`       // 链路追踪ID
-	CreatedAt    int64   `db:"created_at"`     // 创建时间（13位毫秒时间戳）
+	ID          int64   `db:"id"`            // 自增ID
+	GameRoundID string  `db:"game_round_id"` // 游戏回合ID
+	CardList    string  `db:"card_list"`     // 牌面信息
+	Result      string  `db:"result"`        // 游戏结果: dragon|tiger|tie
+	TotalOrders int     `db:"total_orders"`  // 结算订单总数
+	TotalPayout float64 `db:"total_payout"`  // 总派彩金额
+	Operator    string  `db:"operator"`      // 操作人
+	TraceID     string  `db:"trace_id"`      // 链路追踪ID
+	CreatedAt   int64   `db:"created_at"`    // 创建时间（13位毫秒时间戳）
 }
 
 // CreateSettlementLog 创建结算日志（利用唯一索引防止重复结算）
@@ -55,3 +55,9 @@ func GetSettlementLog(ctx context.Context, db *sqlx.DB, gameRoundID string) (*Se
 	return &log, nil
 }
 
+// UpdateSettlementStats 更新结算日志的统计信息（订单数和派彩金额）
+func UpdateSettlementStats(ctx context.Context, exec sqlx.ExtContext, gameRoundID string, totalOrders int, totalPayout float64) error {
+	sqlStr := `UPDATE settlement_log SET total_orders = ?, total_payout = ? WHERE game_round_id = ?`
+	_, err := exec.ExecContext(ctx, sqlStr, totalOrders, totalPayout, gameRoundID)
+	return err
+}
