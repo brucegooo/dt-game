@@ -204,18 +204,18 @@ func (s *drawService) SubmitDrawResult(ctx context.Context, in DrawInput) error 
 	// 第三步：每个用户只锁定一次，批量更新余额和账本
 	for _, us := range userMap {
 		// 锁定用户
-		cust, err := model.GetForUpdate(ctx, tx, us.userID)
+		user, err := model.GetUserByIDForUpdate(ctx, tx, us.userID)
 		if err != nil {
 			return err
 		}
 
 		// 使用 decimal 进行精确计算
-		beforeDec := decimal.NewFromFloat(cust.Balance)
+		beforeDec := decimal.NewFromFloat(user.Balance)
 		totalPayoutDec := decimal.NewFromFloat(us.totalPayout)
 		afterDec := beforeDec.Add(totalPayoutDec).Round(2)
 
 		// 更新余额
-		if err := model.UpdateAmount(ctx, tx, us.userID, afterDec.InexactFloat64()); err != nil {
+		if err := model.UpdateUserBalance(ctx, tx, us.userID, afterDec.InexactFloat64()); err != nil {
 			return err
 		}
 

@@ -478,7 +478,7 @@ func checkConflictingBets(ctx context.Context, tx *sqlx.Tx, gameRoundID string, 
 
 // getOrCreateUserInTx 在事务中获取或创建用户
 // 如果用户不存在，自动创建；如果存在，返回现有用户并加锁
-func getOrCreateUserInTx(ctx context.Context, tx *sqlx.Tx, platformID int8, platformUserID, username string) (*model.User, error) {
+func getOrCreateUserInTx(ctx context.Context, tx *sqlx.Tx, platformID int8, platformUserID, username string) (*model.Customers, error) {
 	// 1. 先尝试加锁查询
 	user, err := model.GetUserByPlatformUserForUpdate(ctx, tx, platformID, platformUserID)
 	if err == nil {
@@ -488,7 +488,7 @@ func getOrCreateUserInTx(ctx context.Context, tx *sqlx.Tx, platformID int8, plat
 	// 2. 如果用户不存在，创建用户
 	if err.Error() == "sql: no rows in result set" {
 		now := time.Now().UnixMilli() // 13位毫秒时间戳
-		newUser := &model.User{
+		newUser := &model.Customers{
 			PlatformID:     platformID,
 			PlatformUserID: platformUserID,
 			Username:       username,
